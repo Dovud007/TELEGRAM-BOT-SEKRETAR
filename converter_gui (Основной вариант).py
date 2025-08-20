@@ -1,0 +1,323 @@
+# =================================================================================
+# ФАЙЛ: converter_gui.py
+# ВЕРСИЯ: 9.0 (НЕУЯЗВИМАЯ) - Финальный парсер, устойчивый к ошибкам ИИ.
+# =================================================================================
+
+import os
+import tkinter as tk
+from tkinter import filedialog, scrolledtext, messagebox, ttk
+import shutil
+import traceback
+import re
+
+def process_files(source_dir, output_file, exclude_dirs, file_patterns, log_callback):
+    """
+    Собирает все файлы проекта в один текстовый файл в формате Markdown.
+    """
+    log_callback(f"--- Начало процесса сборки ---")
+    
+    exclude_dirs = [d.strip() for d in exclude_dirs.split(',') if d.strip()]
+    file_patterns = [p.strip() for p in file_patterns.split(',') if p.strip()]
+
+    try:
+        with open(output_file, 'w', encoding='utf-8', errors='replace') as out_f:
+            intro_comment = (
+                "================================================================================\n"
+                "ВНИМАНИЕ: Этот файл содержит код в формате Markdown.\n"
+                "================================================================================\n\n"
+            )
+            out_f.write(intro_comment)
+            out_f.write('# Исходный код проекта\n\n')
+
+            for root, dirs, files in os.walk(source_dir, topdown=True):
+                dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.startswith('.')]
+
+                for filename in files:
+                    match = False
+                    for pattern in file_patterns:
+                        if (pattern.startswith('*') and filename.endswith(pattern[1:])) or \
+                           (pattern.endswith('*') and filename.startswith(pattern[:-1])) or \
+                           (pattern == filename):
+                            match = True
+                            break
+                    if not match:
+                        continue
+
+                    file_path = os.path.join(root, filename)
+                    relative_path = os.path.relpath(file_path, source_dir).replace('\\', '/')
+                    
+                    log_callback(f"Добавляю файл: {relative_path}")
+
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='replace') as in_f:
+                            content = in_f.read()
+                    except Exception as e:
+                        log_callback(f"  [ОШИБКА] Не удалось прочитать файл: {e}")
+                        content = f"Не удалось прочитать файл: {e}"
+
+                    lang = os.path.splitext(filename)[1].lstrip('.')
+                    if lang == 'py': lang = 'python'
+                    if lang == 'js': lang = 'javascript'
+                    
+                    out_f.write(f"\n---\n\n### `{relative_path}`\n\n")
+                    out_f.write(f"```{lang}\n{content}\n```\n\n")
+
+        log_callback(f"--- Процесс успешно завершен! ---")
+        messagebox.showinfo("Готово", f"Файл успешно создан:\n{output_file}")
+
+    except Exception as e:
+        log_callback(f"!!! КРИТИЧЕСКАЯ ОШИБКА: {e} !!!")
+        messagebox.showerror("Ошибка", f"Произошла ошибка:\n{e}")
+
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Инструменты разработчика v9.0 (ФИНАЛ)")
+        self.root.geometry("950x650")
+
+        self.notebook = ttk.Notebook(root)
+        self.notebook.pack(expand=True, fill='both', padx=10, pady=10)
+
+        self.converter_frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(self.converter_frame, text='Сборщик кода')
+        self.create_converter_tab()
+
+        self.patcher_frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(self.patcher_frame, text='Применение Рецептов')
+        self.create_patcher_tab()
+
+    def create_converter_tab(self):
+        controls_frame = tk.Frame(self.converter_frame)
+        controls_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+        log_frame = tk.Frame(self.converter_frame)
+        log_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        
+        tk.Label(controls_frame, text="1. Папка с проектом:", font=("Arial", 10, "bold")).pack(anchor="w")
+        self.source_dir_entry = tk.Entry(controls_frame, width=40)
+        self.source_dir_entry.pack(fill="x", expand=True)
+        tk.Button(controls_frame, text="Обзор...", command=self.browse_source_dir).pack(anchor="w", pady=(0, 10))
+        
+        tk.Label(controls_frame, text="2. Исключить папки (через запятую):", font=("Arial", 10, "bold")).pack(anchor="w")
+        self.exclude_dirs_entry = tk.Entry(controls_frame, width=40)
+        self.exclude_dirs_entry.insert(0, "venv, __pycache__, .git, .vscode, backups, instance, node_modules")
+        self.exclude_dirs_entry.pack(fill="x", expand=True, pady=(0, 10))
+
+        tk.Label(controls_frame, text="3. Включить файлы (через запятую):", font=("Arial", 10, "bold")).pack(anchor="w")
+        self.file_patterns_entry = tk.Entry(controls_frame, width=40)
+        self.file_patterns_entry.insert(0, "*.py, *.js, *.html, *.css, *.txt, *.json")
+        self.file_patterns_entry.pack(fill="x", expand=True, pady=(0, 10))
+
+        tk.Button(controls_frame, text="СОБРАТЬ ПРОЕКТ В TXT", font=("Arial", 12, "bold"), bg="#28a745", fg="white", command=self.start_converter).pack(fill="x", pady=20)
+
+        tk.Label(log_frame, text="Лог выполнения:", font=("Arial", 10, "bold")).pack(anchor="w")
+        self.converter_log = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, width=60, height=25, font=("Courier New", 9))
+        self.converter_log.pack(fill=tk.BOTH, expand=True)
+        self.converter_log.configure(state='disabled')
+
+    def create_patcher_tab(self):
+        tk.Label(self.patcher_frame, text="1. Вставьте сюда 'рецепт' от ИИ:", font=("Arial", 10, "bold")).pack(anchor="w")
+        self.patch_text = scrolledtext.ScrolledText(self.patcher_frame, wrap=tk.WORD, height=10, font=("Courier New", 10))
+        self.patch_text.pack(fill="x", expand=True, pady=5)
+
+        tk.Button(self.patcher_frame, text="Загрузить рецепт из файла...", command=self.load_patch_from_file).pack(anchor="w", pady=(0, 10))
+
+        tk.Label(self.patcher_frame, text="2. Укажите папку проекта для изменений:", font=("Arial", 10, "bold")).pack(anchor="w")
+        patch_dir_frame = tk.Frame(self.patcher_frame)
+        patch_dir_frame.pack(fill="x", expand=True)
+        self.patch_dir_entry = tk.Entry(patch_dir_frame)
+        self.patch_dir_entry.pack(side=tk.LEFT, fill="x", expand=True)
+        tk.Button(patch_dir_frame, text="Обзор...", command=self.browse_patch_dir).pack(side=tk.LEFT, padx=(5,0))
+
+        tk.Button(self.patcher_frame, text="ПРИМЕНИТЬ РЕЦЕПТ", font=("Arial", 12, "bold"), bg="#007bff", fg="white", command=self.apply_recipe).pack(fill="x", pady=20)
+        
+        tk.Label(self.patcher_frame, text="Лог применения:", font=("Arial", 10, "bold")).pack(anchor="w")
+        self.patcher_log = scrolledtext.ScrolledText(self.patcher_frame, wrap=tk.WORD, height=10, font=("Courier New", 9))
+        self.patcher_log.pack(fill="both", expand=True)
+        self.patcher_log.configure(state='disabled')
+
+    def load_patch_from_file(self):
+        file_path = filedialog.askopenfilename(
+            title="Выбрать файл рецепта",
+            filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")]
+        )
+        if not file_path: return
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                patch_content = f.read()
+            
+            self.patch_text.delete("1.0", tk.END)
+            self.patch_text.insert("1.0", patch_content)
+            self.log_patcher(f"Рецепт успешно загружен из файла: {os.path.basename(file_path)}", "blue")
+        except Exception as e:
+            messagebox.showerror("Ошибка чтения файла", f"Не удалось прочитать файл:\n{e}")
+            self.log_patcher(f"Ошибка чтения файла рецепта: {e}", "red")
+
+    def browse_source_dir(self):
+        directory = filedialog.askdirectory()
+        if directory:
+            self.source_dir_entry.delete(0, tk.END)
+            self.source_dir_entry.insert(0, directory)
+            self.patch_dir_entry.delete(0, tk.END)
+            self.patch_dir_entry.insert(0, directory)
+
+    def log_converter(self, message):
+        self.converter_log.configure(state='normal')
+        self.converter_log.insert(tk.END, message + "\n")
+        self.converter_log.see(tk.END)
+        self.converter_log.configure(state='disabled')
+        self.root.update_idletasks()
+
+    def start_converter(self):
+        source_dir = self.source_dir_entry.get()
+        if not source_dir or not os.path.isdir(source_dir):
+            messagebox.showerror("Ошибка", "Пожалуйста, выберите корректную папку с проектом.")
+            return
+        output_file = filedialog.asksaveasfilename(
+            initialdir=source_dir, title="Сохранить итоговый файл как...",
+            initialfile="project_code.txt", defaultextension=".txt",
+            filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")]
+        )
+        if not output_file: return
+        
+        self.converter_log.configure(state='normal')
+        self.converter_log.delete(1.0, tk.END)
+        self.converter_log.configure(state='disabled')
+
+        process_files(
+            source_dir=source_dir, output_file=output_file,
+            exclude_dirs=self.exclude_dirs_entry.get(),
+            file_patterns=self.file_patterns_entry.get(),
+            log_callback=self.log_converter
+        )
+
+    def browse_patch_dir(self):
+        directory = filedialog.askdirectory()
+        if directory:
+            self.patch_dir_entry.delete(0, tk.END)
+            self.patch_dir_entry.insert(0, directory)
+
+    def log_patcher(self, message, color=None):
+        self.patcher_log.configure(state='normal')
+        if color:
+            tag_name = f"tag_{color}"
+            self.patcher_log.tag_config(tag_name, foreground=color)
+            self.patcher_log.insert(tk.END, message + "\n", tag_name)
+        else:
+            self.patcher_log.insert(tk.END, message + "\n")
+        self.patcher_log.see(tk.END)
+        self.patcher_log.configure(state='disabled')
+        self.root.update_idletasks()
+
+    def apply_recipe(self):
+        """
+        ФИНАЛЬНЫЙ НЕУЯЗВИМЫЙ ПАРСЕР: Обрабатывает рецепты, 
+        игнорируя мелкие ошибки форматирования ИИ (например, пропущенные '>>>').
+        """
+        recipe_text = self.patch_text.get("1.0", tk.END).strip()
+        project_dir = self.patch_dir_entry.get()
+
+        if not recipe_text or not project_dir or not os.path.isdir(project_dir):
+            messagebox.showerror("Ошибка", "Вставьте текст рецепта и выберите папку проекта.")
+            return
+
+        self.patcher_log.configure(state='normal')
+        self.patcher_log.delete(1.0, tk.END)
+        self.patcher_log.configure(state='disabled')
+        
+        self.log_patcher("--- Начинаю применение (НЕУЯЗВИМЫЙ РЕЖИМ) ---", "blue")
+        
+        try:
+            file_blocks = re.split(r'(--- ИЗМЕНЕНИЯ ДЛЯ ФАЙЛА:.*?---)', recipe_text)
+            total_changes_applied = 0
+            
+            if not file_blocks[0].strip():
+                file_blocks = file_blocks[1:]
+            
+            it = iter(file_blocks)
+            processed_blocks = dict(zip(it, it))
+
+            for header, content in processed_blocks.items():
+                match = re.search(r'--- ИЗМЕНЕНИЯ ДЛЯ ФАЙЛА:(.*?)---', header)
+                if not match:
+                    continue
+                
+                relative_path = match.group(1).strip()
+                target_file_path = os.path.join(project_dir, relative_path.replace('/', os.sep))
+                
+                if not os.path.exists(target_file_path):
+                    self.log_patcher(f"ОШИБКА: Файл не найден: {target_file_path}", "red")
+                    continue
+                
+                self.log_patcher(f"\nРаботаю с файлом: {relative_path}", "purple")
+
+                edit_blocks = re.split(r'\[\[\[ПРАВКА\]\]\]', content)
+                
+                with open(target_file_path, 'r', encoding='utf-8') as f:
+                    original_content = f.read()
+                
+                modified_content = original_content
+                changes_in_file = 0
+
+                for edit_block in edit_blocks:
+                    if not edit_block.strip():
+                        continue
+                        
+                    try:
+                        # ГИБКИЙ ПАРСИНГ: Разделяем блок, делая '>>>' необязательными
+                        find_split = re.split(r'(?:>>>)?\s*НАЙТИ', edit_block, 1)
+                        if len(find_split) < 2: continue
+                        
+                        replace_split = re.split(r'(?:>>>)?\s*ЗАМЕНИТЬ НА', find_split[1], 1)
+                        if len(replace_split) < 2: continue
+                            
+                        find_str = replace_split[0].strip()
+                        replace_str = replace_split[1].strip()
+
+                        if not find_str: # Пропускаем, если блок для поиска пуст
+                            continue
+
+                        if find_str not in modified_content:
+                            self.log_patcher(f"  - Не найден блок для замены:\n{find_str[:150]}...", "orange")
+                        else:
+                            modified_content = modified_content.replace(find_str, replace_str, 1)
+                            self.log_patcher(f"  + Успешно применено изменение.", "green")
+                            changes_in_file += 1
+                    except Exception as e:
+                        self.log_patcher(f"  - Ошибка парсинга блока правки: {e}", "orange")
+                        continue
+                
+                if changes_in_file > 0:
+                    backup_path = target_file_path + ".bak"
+                    shutil.copy2(target_file_path, backup_path)
+                    self.log_patcher(f"  -> Создана резервная копия: {os.path.basename(backup_path)}", "blue")
+                    
+                    with open(target_file_path, 'w', encoding='utf-8') as f:
+                        f.write(modified_content)
+                    self.log_patcher(f"  -> Файл '{os.path.basename(target_file_path)}' успешно сохранен.", "green")
+                    total_changes_applied += changes_in_file
+                else:
+                    self.log_patcher(f"  -> Изменений для файла '{os.path.basename(target_file_path)}' не найдено.", "gray")
+
+            self.log_patcher(f"\n--- ЗАВЕРШЕНО: Всего применено изменений: {total_changes_applied} ---", "green" if total_changes_applied > 0 else "blue")
+            messagebox.showinfo("Готово", f"Применение рецепта завершено.\nВсего внесено изменений: {total_changes_applied}")
+
+        except Exception as e:
+            self.log_patcher(f"!!! КРИТИЧЕСКАЯ ОШИБКА: {e}", "red")
+            traceback.print_exc()
+            messagebox.showerror("Критическая ошибка", f"Произошла непредвиденная ошибка:\n{e}")
+
+if __name__ == "__main__":
+    try:
+        main_window = tk.Tk()
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("TNotebook.Tab", padding=[10, 5], font=("Arial", 10))
+        style.configure("TButton", padding=6, relief="flat", background="#ccc")
+        
+        app = App(main_window)
+        main_window.mainloop()
+    except Exception as e:
+        print("!!! Произошла критическая ошибка при запуске приложения !!!")
+        traceback.print_exc()
+        input("\nНажмите Enter для выхода...")
