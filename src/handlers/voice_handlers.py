@@ -6,8 +6,13 @@ from faster_whisper import WhisperModel
 from pydub import AudioSegment
 
 # Импортируем наш новый парсер и функцию для работы с БД
+from config import FFMPEG_PATH
 from services.parser import parse_expense_text
 from services.database import add_expense
+
+# Если путь к FFmpeg указан в конфиге, задаем его для pydub
+if FFMPEG_PATH:
+    AudioSegment.converter = FFMPEG_PATH
 
 router = Router()
 
