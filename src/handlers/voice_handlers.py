@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 from aiogram import Router, F
 from aiogram.types import Message
@@ -6,8 +7,13 @@ from faster_whisper import WhisperModel
 from pydub import AudioSegment
 
 # Импортируем наш новый парсер и функцию для работы с БД
+from config import FFMPEG_PATH
 from services.parser import parse_expense_text
 from services.database import add_expense
+
+# Если путь к FFmpeg указан в конфиге, задаем его для pydub
+if FFMPEG_PATH:
+    AudioSegment.converter = FFMPEG_PATH
 
 router = Router()
 
@@ -16,8 +22,10 @@ model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
 
 @router.message(F.voice)
 async def voice_message_handler(message: Message, bot):
-    voice_dir = Path("temp_voices")
+    # Создаем временную директорию для этого конкретного файла
+    voice_dir = Path(tempfile.gettempdir()) / "secretary_bot_voices"
     voice_dir.mkdir(exist_ok=True)
+
     voice_file_info = await bot.get_file(message.voice.file_id)
     voice_oga_path = voice_dir / f"{message.voice.file_id}.oga"
     await bot.download_file(voice_file_info.file_path, destination=voice_oga_path)

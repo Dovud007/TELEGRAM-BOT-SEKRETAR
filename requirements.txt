@@ -1,1 +1,5 @@
-pip freeze
+aiogram
+faster-whisper
+pydub
+pandas
+openpyxl
