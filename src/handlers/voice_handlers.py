@@ -4,6 +4,7 @@ from pathlib import Path
 import json
 from aiogram import Router, F
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.fsm.context import FSMContext
 from faster_whisper import WhisperModel
 from pydub import AudioSegment
 
@@ -11,6 +12,7 @@ from pydub import AudioSegment
 from config import FFMPEG_PATH
 from services.vertex_ai import parse_expense_with_llm
 from services.database import add_expense
+from states import ExpenseConversation
 
 # Если путь к FFmpeg указан в конфиге, задаем его для pydub
 if FFMPEG_PATH:
@@ -50,7 +52,7 @@ def create_confirmation_keyboard(data: dict) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 @router.message(F.voice)
-async def voice_message_handler(message: Message, bot):
+async def voice_message_handler(message: Message, bot, state: FSMContext):
     await message.answer("🎤 Услышал вас, начинаю распознавание...")
 
     voice_dir = Path(tempfile.gettempdir()) / "secretary_bot_voices"
@@ -82,9 +84,28 @@ async def voice_message_handler(message: Message, bot):
             )
         elif intent == "get_report":
             # Если LLM распознал команду на получение отчета
-            # Импортируем и вызываем новый обработчик
             from . import report_handlers
             await report_handlers.handle_report_request(message, parsed_data)
+
+        elif intent == "add_expense_incomplete":
+            # Если LLM распознал неполную команду на добавление расхода
+            # Сохраняем частичные данные в FSM
+            await state.update_data(
+                category=parsed_data.get("category"),
+                dates=parsed_data.get("dates")
+            )
+            # Задаем уточняющий вопрос и показываем кастомные кнопки
+            clarification_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🎤 Озвучить суммы", callback_data="provide_amounts")],
+                [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_fsm")]
+            ])
+            await message.answer(
+                text=parsed_data.get("clarification_question", "Пожалуйста, уточните детали."),
+                reply_markup=clarification_keyboard
+            )
+            # Устанавливаем состояние ожидания сумм
+            await state.set_state(ExpenseConversation.waiting_for_amounts)
+
         else:
             # Если LLM не смог распознать намерение
             await message.answer(
