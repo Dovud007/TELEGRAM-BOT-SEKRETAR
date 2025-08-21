@@ -11,10 +11,11 @@ from aiogram.enums import ParseMode
 
 # Импортируем наш токен и путь к FFmpeg из файла конфигурации
 from config import BOT_TOKEN, FFMPEG_PATH
-# Импортируем нашу функцию для инициализации БД
+# Импортируем наши функции для инициализации
 from services.database import init_db
+from services.vertex_ai import init_vertex_ai
 # Импортируем все наши роутеры
-from handlers import expense_handlers, voice_handlers
+from handlers import expense_handlers, voice_handlers, common_handlers
 
 # Настраиваем логирование, чтобы видеть информацию о работе бота в консоли
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +26,7 @@ bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTM
 dp = Dispatcher()
 
 # Подключаем роутеры к главному диспетчеру
+dp.include_router(common_handlers.router) # Обработчики общих колбэков
 dp.include_router(expense_handlers.router)
 dp.include_router(voice_handlers.router)
 
@@ -54,13 +56,20 @@ def check_ffmpeg():
 
 # Основная функция для запуска бота
 async def main():
-    # Перед запуском проверяем, доступен ли FFmpeg
+    # Перед запуском выполняем все необходимые проверки и инициализации
     if not check_ffmpeg():
         return  # Завершаем работу, если FFmpeg не найден
 
-    # Вызываем функцию инициализации базы данных перед запуском бота
+    # Инициализируем сервисы
     init_db()
-    
+    try:
+        init_vertex_ai()
+        logging.info("Vertex AI успешно инициализирован.")
+    except Exception as e:
+        logging.critical(f"!!! ОШИБКА: Не удалось инициализировать Vertex AI: {e}")
+        logging.critical("Убедитесь, что переменные GCP в .env файле указаны верно и вы прошли аутентификацию gcloud.")
+        return
+
     # Запускаем обработку входящих сообщений
     await dp.start_polling(bot)
 

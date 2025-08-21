@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import datetime
 
-DB_PATH = '../database.db' # Путь к файлу БД. '../' означает "на одну папку выше"
+DB_PATH = 'database.db' # БД будет создана в корневой папке проекта
 
 def get_connection():
     """Устанавливает соединение с базой данных."""
