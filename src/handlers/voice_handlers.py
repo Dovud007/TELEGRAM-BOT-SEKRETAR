@@ -36,10 +36,12 @@ def create_confirmation_keyboard(data: dict) -> InlineKeyboardMarkup:
     callback_data.pop('confirmation_message', None)
 
     # Ограничиваем длину категории, чтобы не превысить лимит callback_data
-    if len(callback_data['category']) > 20:
-        callback_data['category'] = callback_data['category'][:20]
+    # Новое значение 10 вместо 20, чтобы избежать ошибки BUTTON_DATA_INVALID
+    if len(callback_data['category']) > 10:
+        callback_data['category'] = callback_data['category'][:10]
 
-    yes_callback = json.dumps(callback_data)
+    # Используем ensure_ascii=False для более компактного представления кириллицы
+    yes_callback = json.dumps(callback_data, ensure_ascii=False)
 
     buttons = [
         [
