@@ -10,3 +10,6 @@ __pycache__/
 
 # Database file
 *.db
+google_credentials.json
+converter_gui (Основной вариант).py
+project_code.txt
