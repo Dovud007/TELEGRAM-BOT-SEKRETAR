@@ -37,14 +37,18 @@ async def handle_report_request(message: Message, parsed_data: dict):
         # Генерируем Excel-файл
         report_path = create_excel_report(expenses)
 
-        # Отправляем файл пользователю
-        await message.answer_document(
-            FSInputFile(report_path),
-            caption="Ваш отчет по расходам готов."
-        )
-
-        # Удаляем временный файл после отправки
-        os.remove(report_path)
+        try:
+            # Отправляем файл пользователю
+            await message.answer_document(
+                FSInputFile(report_path),
+                caption="Ваш отчет по расходам готов."
+            )
+        finally:
+            # Удаляем временный файл после отправки, даже если отправка не удалась.
+            # Блок finally гарантирует, что эта строка выполнится после завершения await.
+            os.remove(report_path)
 
     except Exception as e:
-        await message.answer(f"Произошла ошибка при создании отчета: {e}")
+        # Этот блок теперь будет ловить ошибки, не связанные с отправкой файла
+        # (например, ошибки при конвертации дат или получении данных из БД)
+        await message.answer(f"Произошла ошибка при подготовке данных для отчета: {e}")
