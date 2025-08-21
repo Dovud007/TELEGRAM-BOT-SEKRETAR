@@ -24,28 +24,26 @@ MODEL_SIZE = "medium"
 # after a restart might take a bit longer to process.
 model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
 
-def create_confirmation_keyboard(data: dict) -> InlineKeyboardMarkup:
-    """Создает клавиатуру с кнопками Да/Нет для подтверждения расхода."""
-    # Мы не можем передать целый словарь в callback_data, поэтому сериализуем его в JSON
-    # и убедимся, что он не слишком длинный.
-    # Более надежный способ - хранить временные данные в кэше (например, Redis)
-    # и передавать только уникальный ключ. Но для простоты пока так.
+from services.cache import temp_data_cache
 
-    # Убираем confirmation_message, чтобы не передавать лишнего
+def create_confirmation_keyboard(data: dict) -> InlineKeyboardMarkup:
+    """
+    Создает клавиатуру с кнопками Да/Нет для подтверждения расхода.
+    Использует кэш для временного хранения данных.
+    """
+    # Убираем confirmation_message, т.к. оно не нужно для сохранения
     callback_data = data.copy()
     callback_data.pop('confirmation_message', None)
 
-    # Ограничиваем длину категории, чтобы не превысить лимит callback_data
-    # Новое значение 10 вместо 20, чтобы избежать ошибки BUTTON_DATA_INVALID
-    if len(callback_data['category']) > 10:
-        callback_data['category'] = callback_data['category'][:10]
+    # Сохраняем данные в кэш и получаем уникальный ключ
+    data_key = temp_data_cache.set(callback_data)
 
-    # Используем ensure_ascii=False для более компактного представления кириллицы
-    yes_callback = json.dumps(callback_data, ensure_ascii=False)
+    # Теперь callback_data содержит только короткий и безопасный ключ
+    yes_callback_data = f"confirm_expense:yes:{data_key}"
 
     buttons = [
         [
-            InlineKeyboardButton(text="✅ Да, все верно", callback_data=f"confirm_expense:yes:{yes_callback}"),
+            InlineKeyboardButton(text="✅ Да, все верно", callback_data=yes_callback_data),
             InlineKeyboardButton(text="❌ Нет, уточнить", callback_data="confirm_expense:no")
         ]
     ]
