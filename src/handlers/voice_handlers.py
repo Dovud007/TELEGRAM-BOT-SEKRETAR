@@ -73,20 +73,26 @@ async def voice_message_handler(message: Message, bot):
 
         # Отправляем текст в LLM для анализа
         parsed_data = parse_expense_with_llm(recognized_text)
+        intent = parsed_data.get("intent") if parsed_data else None
 
-        if parsed_data and parsed_data.get('amount'):
-            # Если LLM вернул данные, запрашиваем подтверждение
+        if intent == "add_expense":
+            # Если LLM распознал команду на добавление расхода
             keyboard = create_confirmation_keyboard(parsed_data)
             await message.answer(
                 text=parsed_data['confirmation_message'],
                 reply_markup=keyboard
             )
+        elif intent == "get_report":
+            # Если LLM распознал команду на получение отчета
+            # Импортируем и вызываем новый обработчик
+            from . import report_handlers
+            await report_handlers.handle_report_request(message, parsed_data)
         else:
-            # Если LLM не смог распознать расход
+            # Если LLM не смог распознать намерение
             await message.answer(
-                "Я вас услышал, но не смог распознать это как команду на запись расхода.\n"
+                "Я вас услышал, но не смог распознать это как известную мне команду.\n"
                 f"**Распознанный текст:** `{recognized_text}`\n\n"
-                "Пожалуйста, уточните, что вы имели в виду, или скажите о расходе более явно."
+                "Пожалуйста, попробуйте переформулировать."
             )
 
     except Exception as e:

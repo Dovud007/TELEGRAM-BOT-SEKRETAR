@@ -15,17 +15,20 @@ def init_vertex_ai():
 
 def parse_expense_with_llm(text: str) -> dict | None:
     """
-    Uses a Large Language Model to parse the expense from text.
-    Returns a dictionary with 'amount', 'category', and 'confirmation_message' or None on failure.
+    Uses a Large Language Model to parse user intent from text.
+    Can parse 'add_expense' or 'get_report' intents.
+    Returns a dictionary with the parsed data or None on failure.
     """
     response_text = ""
     try:
         init_vertex_ai()
 
-        # Simplified, single-string few-shot prompt.
+        # Extended few-shot prompt with intents.
+        # The date for the examples is assumed to be 2025-08-21.
         # Double braces {{...}} are used to escape the JSON for the f-string.
         prompt = f"""You are an intelligent assistant for a voice-controlled expense tracker.
-Your task is to interpret a transcribed voice message from a user and extract the expense amount and category.
+Your task is to interpret a transcribed voice message and determine the user's intent.
+The two possible intents are 'add_expense' and 'get_report'.
 Your response MUST be a valid JSON object. Do not add any text before or after the JSON.
 
 ---
@@ -34,6 +37,7 @@ USER:
 
 MODEL:
 {{
+  "intent": "add_expense",
   "amount": 250.0,
   "category": "кофе",
   "confirmation_message": "Вы имели в виду расход 250.00 на 'кофе' сегодняшним числом? Я правильно понял?"
@@ -44,19 +48,30 @@ USER:
 
 MODEL:
 {{
+  "intent": "add_expense",
   "amount": 500000.0,
   "category": "ужин",
   "confirmation_message": "Вы имели в виду расход 500000.00 на 'ужин' сегодняшним числом? Я правильно понял?"
 }}
 ---
 USER:
-Расход 30 тысяч на продукты
+какие были расходы за прошлую неделю
 
 MODEL:
 {{
-  "amount": 30000.0,
-  "category": "продукты",
-  "confirmation_message": "Вы имели в виду расход 30000.00 на 'продукты' сегодняшним числом? Я правильно понял?"
+  "intent": "get_report",
+  "start_date": "2025-08-11",
+  "end_date": "2025-08-17"
+}}
+---
+USER:
+покажи отчет за этот месяц
+
+MODEL:
+{{
+  "intent": "get_report",
+  "start_date": "2025-08-01",
+  "end_date": "2025-08-21"
 }}
 ---
 USER:
@@ -82,7 +97,8 @@ MODEL:
 
         parsed_response = json.loads(json_str)
 
-        if parsed_response and parsed_response.get('amount'):
+        # Check for a valid intent instead of just 'amount'
+        if parsed_response and parsed_response.get('intent'):
             return parsed_response
         else:
             return None
