@@ -1,8 +1,8 @@
-import json
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 
 from services.database import add_expense
+from services.cache import temp_data_cache
 
 router = Router()
 
@@ -23,8 +23,19 @@ async def handle_expense_confirmation(callback: CallbackQuery):
         data_str = None
 
     if action == "yes" and data_str:
+        # data_str is now the key to our cache
+        expense_data = temp_data_cache.get(data_str)
+
+        if not expense_data:
+            # This can happen if the bot was restarted after the button was sent
+            await callback.message.edit_text(
+                "😕 К сожалению, данные для этого подтверждения устарели. "
+                "Пожалуйста, отправьте команду еще раз.",
+                reply_markup=None
+            )
+            return
+
         try:
-            expense_data = json.loads(data_str)
             amount = float(expense_data['amount'])
             category = expense_data['category']
 
@@ -35,7 +46,7 @@ async def handle_expense_confirmation(callback: CallbackQuery):
             await callback.message.edit_text(
                 f"✅ Я вас понял. Внес расход на сумму **{amount:.2f}** в категорию **'{category}'**."
             )
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
+        except (KeyError, ValueError) as e:
             await callback.message.edit_text(
                 f"😕 Произошла ошибка при обработке вашего подтверждения: {e}\n"
                 "Пожалуйста, попробуйте еще раз.",
