@@ -3,6 +3,20 @@ import logging
 import shutil
 import os
 
+# --- НАЧАЛО БЛОКА ДЛЯ ИСПРАВЛЕНИЯ ПУТИ FFMPEG ---
+# Этот блок должен быть в самом верху, до импорта других модулей, использующих ffmpeg.
+# Он добавляет директорию с ffmpeg в системный PATH, чтобы pydub нашел и ffmpeg, и ffprobe.
+try:
+    from config import FFMPEG_PATH
+    if FFMPEG_PATH and os.path.isfile(FFMPEG_PATH):
+        ffmpeg_dir = os.path.dirname(FFMPEG_PATH)
+        os.environ["PATH"] = str(ffmpeg_dir) + os.pathsep + os.environ.get("PATH", "")
+        print(f"INFO: FFmpeg directory '{ffmpeg_dir}' was successfully added to the system PATH.")
+except ImportError:
+    print("INFO: Could not import FFMPEG_PATH from config. Relying on system PATH for FFmpeg.")
+    pass
+# --- КОНЕЦ БЛОКА ---
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
 from aiogram.filters import CommandStart
