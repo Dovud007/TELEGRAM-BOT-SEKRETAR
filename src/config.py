@@ -20,3 +20,15 @@ if not BOT_TOKEN:
 #
 # Если FFmpeg находится в системном PATH, можно оставить значение пустым (None)
 FFMPEG_PATH = os.getenv('FFMPEG_PATH')
+
+# --- Настройка для Vertex AI ---
+GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID')
+GCP_LOCATION = os.getenv('GCP_LOCATION')
+GCP_MODEL_NAME = os.getenv('GCP_MODEL_NAME')
+
+# Проверка, что все необходимые переменные для Vertex AI заданы
+if not all([GCP_PROJECT_ID, GCP_LOCATION, GCP_MODEL_NAME]):
+    print("Ошибка: не все переменные для Vertex AI заданы в .env файле.")
+    print("Необходимы: GCP_PROJECT_ID, GCP_LOCATION, GCP_MODEL_NAME")
+    # Можно либо завершить работу, либо работать в режиме без AI
+    # exit()

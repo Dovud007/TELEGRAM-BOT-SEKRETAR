@@ -3,3 +3,5 @@ faster-whisper
 pydub
 pandas
 openpyxl
+google-cloud-aiplatform
+python-dotenv
