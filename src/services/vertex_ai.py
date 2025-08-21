@@ -28,7 +28,8 @@ def parse_expense_with_llm(text: str) -> dict | None:
         # Double braces {{...}} are used to escape the JSON for the f-string.
         prompt = f"""You are an intelligent assistant for a voice-controlled expense tracker.
 Your task is to interpret a transcribed voice message and determine the user's intent.
-The two possible intents are 'add_expense' and 'get_report'.
+The possible intents are 'add_expense', 'add_expense_incomplete', and 'get_report'.
+If a user wants to add an expense but provides multiple dates or is missing an amount, use the 'add_expense_incomplete' intent.
 Your response MUST be a valid JSON object. Do not add any text before or after the JSON.
 
 ---
@@ -72,6 +73,17 @@ MODEL:
   "intent": "get_report",
   "start_date": "2025-08-01",
   "end_date": "2025-08-21"
+}}
+---
+USER:
+запиши расход на ужин с двадцатого по двадцать второе августа
+
+MODEL:
+{{
+  "intent": "add_expense_incomplete",
+  "category": "ужин",
+  "dates": ["2025-08-20", "2025-08-21", "2025-08-22"],
+  "clarification_question": "Я правильно понял, что вы хотите добавить расход на 'ужин' за 20, 21 и 22 августа? Пожалуйста, уточните сумму для каждого расхода."
 }}
 ---
 USER:
